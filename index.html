@@ -1,0 +1,1314 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Set Timer</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#0f172a">
+<link rel="icon" href="icon-192.png" type="image/png">
+<link rel="apple-touch-icon" href="icon-180.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Set Timer">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<style>
+  :root{
+    --bg:#0f172a; --panel:#1e293b; --panel-2:#273549; --border:#334155;
+    --text:#f1f5f9; --muted:#94a3b8; --accent:#38bdf8;
+    --green:#22c55e; --amber:#f59e0b; --red:#ef4444;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;min-height:100vh;}
+  .app{max-width:720px;margin:0 auto;padding:16px;padding-bottom:120px;}
+  h1{font-size:20px;margin:8px 0 16px;display:flex;align-items:center;gap:8px;justify-content:space-between;}
+  h1 .left{display:flex;align-items:center;gap:8px;}
+  h1 .dot{width:8px;height:8px;border-radius:50%;background:var(--accent);}
+  .gear-btn{background:var(--panel);border:1px solid var(--border);color:var(--muted);border-radius:8px;width:32px;height:32px;font-size:15px;}
+
+  .tabs{display:flex;gap:8px;margin-bottom:16px;}
+  .tab-btn{flex:1;padding:10px;border-radius:10px;border:1px solid var(--border);background:var(--panel);color:var(--muted);font-size:14px;font-weight:600;}
+  .tab-btn.active{background:var(--accent);color:#031018;border-color:var(--accent);}
+  .card{background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:14px;margin-bottom:12px;}
+  .muted{color:var(--muted);font-size:13px;}
+  .banner{background:var(--panel-2);border:1px solid var(--accent);border-radius:10px;padding:10px 12px;margin-bottom:12px;font-size:13px;display:flex;justify-content:space-between;align-items:center;gap:8px;}
+  .banner button{background:var(--accent);color:#031018;border:none;border-radius:6px;padding:6px 10px;font-size:12px;font-weight:700;}
+  .banner .dismiss{background:transparent;color:var(--muted);border:none;font-size:12px;text-decoration:underline;}
+
+  /* Import section */
+  .import-toggle{width:100%;padding:12px;border-radius:10px;border:1px dashed var(--accent);background:transparent;color:var(--accent);font-size:14px;font-weight:600;margin-bottom:12px;}
+  .import-box{margin-bottom:12px;}
+  .import-box textarea{width:100%;min-height:100px;background:var(--panel-2);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:10px;font-size:13px;font-family:inherit;resize:vertical;}
+  .file-drop{border:1px dashed var(--border);border-radius:10px;padding:16px;text-align:center;margin-bottom:10px;}
+  .file-drop input{color:var(--muted);font-size:13px;}
+  .import-actions{display:flex;gap:8px;margin-top:8px;}
+  .btn-secondary{flex:1;padding:10px;border-radius:8px;border:1px solid var(--border);background:var(--panel-2);color:var(--text);font-size:13px;font-weight:600;}
+  .btn-accent{flex:1;padding:10px;border-radius:8px;border:none;background:var(--accent);color:#031018;font-size:13px;font-weight:700;}
+  .status-line{font-size:13px;margin-top:8px;min-height:18px;}
+  .status-line.err{color:var(--red);}
+  .status-line.ok{color:var(--green);}
+
+  .song-row{display:flex;align-items:flex-start;gap:8px;padding:10px 0;border-bottom:1px solid var(--border);}
+  .song-row:last-child{border-bottom:none;}
+  .song-num{width:22px;color:var(--muted);font-size:13px;text-align:center;padding-top:6px;}
+  .song-fields{flex:1;display:flex;flex-direction:column;gap:6px;}
+  .song-title{background:transparent;border:none;color:var(--text);font-size:15px;font-weight:600;padding:2px 0;outline:none;width:100%;}
+  .song-title::placeholder{color:var(--muted);font-weight:400;}
+  .song-person{background:transparent;border:none;color:var(--muted);font-size:12px;padding:0 0 2px;outline:none;width:100%;}
+  .song-person::placeholder{color:#5b6b84;}
+  .dur-row{display:flex;align-items:center;gap:6px;}
+  .dur-input{width:56px;background:var(--panel-2);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:4px 6px;font-size:13px;text-align:center;}
+  .dur-sep{color:var(--muted);font-size:13px;}
+  .row-actions{display:flex;flex-direction:column;gap:4px;}
+  .icon-btn{background:var(--panel-2);border:1px solid var(--border);color:var(--muted);border-radius:6px;width:30px;height:30px;font-size:14px;display:flex;align-items:center;justify-content:center;}
+  .icon-btn.danger{color:var(--red);}
+  .add-btn{width:100%;padding:12px;border-radius:10px;border:1px dashed var(--border);background:transparent;color:var(--accent);font-size:14px;font-weight:600;margin-top:6px;}
+  .total-line{display:flex;justify-content:space-between;color:var(--muted);font-size:13px;padding:8px 4px 0;}
+  .primary-btn{width:100%;padding:14px;border-radius:12px;border:none;background:var(--accent);color:#031018;font-size:16px;font-weight:700;margin-top:14px;}
+  .primary-btn:disabled{opacity:.4;}
+
+  .live-wrap{display:flex;flex-direction:column;align-items:center;gap:14px;padding-top:10px;}
+  .set-progress{width:100%;color:var(--muted);font-size:13px;display:flex;justify-content:space-between;}
+  .schedule-badge{font-size:11px;padding:2px 8px;border-radius:20px;font-weight:700;}
+  .schedule-badge.ontime{background:rgba(34,197,94,.15);color:var(--green);}
+  .schedule-badge.behind{background:rgba(239,68,68,.15);color:var(--red);}
+  .schedule-badge.ahead{background:rgba(56,189,248,.15);color:var(--accent);}
+  .song-name{font-size:22px;font-weight:700;text-align:center;margin-top:2px;}
+  .song-person-live{font-size:14px;color:var(--accent);text-align:center;}
+  .next-name{font-size:13px;color:var(--muted);text-align:center;}
+  .big-timer{font-size:88px;font-weight:800;font-variant-numeric:tabular-nums;line-height:1;padding:16px 0;transition:color .3s;}
+  .big-timer.green{color:var(--green);}
+  .big-timer.amber{color:var(--amber);}
+  .big-timer.red{color:var(--red);}
+  .set-timer-box{width:100%;background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:14px;display:flex;justify-content:space-between;align-items:center;}
+  .set-timer-box .label{color:var(--muted);font-size:12px;}
+  .set-timer-box .val{font-size:26px;font-weight:700;font-variant-numeric:tabular-nums;}
+  .set-timer-box .val.over{color:var(--red);}
+  .adjust-row{display:flex;gap:8px;width:100%;justify-content:center;}
+  .adjust-btn{flex:1;padding:10px;border-radius:10px;border:1px solid var(--border);background:var(--panel-2);color:var(--text);font-size:14px;font-weight:600;}
+  .controls{display:flex;gap:10px;width:100%;margin-top:6px;}
+  .ctrl-btn{flex:1;padding:16px;border-radius:12px;border:none;font-size:16px;font-weight:700;}
+  .ctrl-next{background:var(--accent);color:#031018;}
+  .ctrl-pause{background:var(--panel-2);color:var(--text);border:1px solid var(--border);}
+  .util-row{display:flex;gap:8px;width:100%;margin-top:4px;}
+  .util-btn{flex:1;padding:10px;border-radius:10px;border:1px solid var(--border);background:transparent;color:var(--muted);font-size:12px;font-weight:600;}
+  .end-link{margin-top:6px;color:var(--muted);font-size:13px;text-decoration:underline;background:none;border:none;}
+  .done-screen{text-align:center;padding-top:30px;}
+  .done-screen h2{font-size:26px;}
+  .report-table{width:100%;text-align:left;border-collapse:collapse;margin-top:16px;font-size:13px;}
+  .report-table th{color:var(--muted);font-weight:600;padding:6px 4px;border-bottom:1px solid var(--border);}
+  .report-table td{padding:6px 4px;border-bottom:1px solid var(--border);}
+  .report-table td.over{color:var(--red);}
+  .report-table td.under{color:var(--green);}
+  .empty{color:var(--muted);text-align:center;padding:30px 0;font-size:14px;}
+
+  /* Jump list */
+  .jump-list{width:100%;max-height:180px;overflow-y:auto;background:var(--panel);border:1px solid var(--border);border-radius:10px;}
+  .jump-item{padding:10px 12px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;font-size:13px;}
+  .jump-item:last-child{border-bottom:none;}
+  .jump-item.current{background:var(--panel-2);color:var(--accent);font-weight:700;}
+  .jump-item button{background:transparent;border:none;color:var(--muted);font-size:12px;text-decoration:underline;}
+
+  /* Settings modal */
+  .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);display:flex;align-items:flex-end;justify-content:center;z-index:50;}
+  .modal-sheet{background:var(--panel);border-radius:16px 16px 0 0;padding:18px;width:100%;max-width:720px;max-height:85vh;overflow-y:auto;}
+  .modal-sheet h3{margin-top:0;}
+  .field-label{font-size:12px;color:var(--muted);margin:10px 0 4px;}
+  .field-input{width:100%;background:var(--panel-2);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:10px;font-size:14px;}
+  .close-modal{width:100%;padding:12px;border-radius:10px;border:1px solid var(--border);background:var(--panel-2);color:var(--text);font-weight:600;margin-top:14px;}
+
+  /* Stage cast view */
+  body.stage-view{background:#000;}
+  .stage-only{display:none;}
+  body.stage-view .stage-only{display:flex;}
+  body.stage-view .app{display:none;}
+  .stage-container{
+    position:fixed;top:50%;left:50%;width:100vw;height:100vh;
+    display:flex;flex-direction:column;align-items:center;justify-content:center;gap:20px;
+    transform:translate(-50%,-50%) rotate(0deg);
+    transition:transform .25s ease, width .25s ease, height .25s ease;
+  }
+  body.stage-view[data-rot="90"] .stage-container{transform:translate(-50%,-50%) rotate(90deg);width:100vh;height:100vw;}
+  body.stage-view[data-rot="180"] .stage-container{transform:translate(-50%,-50%) rotate(180deg);}
+  body.stage-view[data-rot="270"] .stage-container{transform:translate(-50%,-50%) rotate(270deg);width:100vh;height:100vw;}
+  .stage-title{font-size:5vw;font-weight:700;color:#f1f5f9;text-align:center;padding:0 20px;}
+  .stage-timer{font-size:22vw;font-weight:800;font-variant-numeric:tabular-nums;line-height:1;}
+  .stage-timer.green{color:var(--green);}
+  .stage-timer.amber{color:var(--amber);}
+  .stage-timer.red{color:var(--red);}
+  .stage-next{font-size:2.5vw;color:#94a3b8;}
+  /* When physically rotated 90/270, swap which viewport axis the font sizes track */
+  body.stage-view[data-rot="90"] .stage-title, body.stage-view[data-rot="270"] .stage-title{font-size:5vh;}
+  body.stage-view[data-rot="90"] .stage-timer, body.stage-view[data-rot="270"] .stage-timer{font-size:22vh;}
+  body.stage-view[data-rot="90"] .stage-next, body.stage-view[data-rot="270"] .stage-next{font-size:2.5vh;}
+
+  .stage-controls{position:fixed;top:12px;right:12px;display:flex;gap:8px;z-index:5;opacity:.35;transition:opacity .2s;}
+  .stage-controls:hover, .stage-controls:focus-within{opacity:1;}
+  .stage-ctrl-btn{background:rgba(30,41,59,.7);border:1px solid rgba(148,163,184,.4);color:#f1f5f9;border-radius:8px;width:38px;height:38px;font-size:16px;}
+</style>
+</head>
+<body>
+
+<!-- STAGE CAST VIEW (shown only when opened with #stage) -->
+<div class="stage-only stage-controls">
+  <button class="stage-ctrl-btn" onclick="rotateStageView()" title="Rotate screen">⟳</button>
+  <button class="stage-ctrl-btn" onclick="toggleStageFullscreen()" title="Fullscreen">⤢</button>
+</div>
+<div class="stage-only stage-container">
+  <div class="stage-title" id="stageTitle">Waiting for set to start…</div>
+  <div class="stage-timer green" id="stageTimer">0:00</div>
+  <div class="stage-next" id="stageNext"></div>
+</div>
+
+<div class="app">
+  <h1>
+    <span class="left"><span class="dot"></span>Set Timer</span>
+    <button class="gear-btn" onclick="openSettings()">⚙</button>
+  </h1>
+
+  <div class="tabs">
+    <button class="tab-btn active" id="tabBuildBtn" onclick="switchTab('build')">Build Set</button>
+    <button class="tab-btn" id="tabLiveBtn" onclick="switchTab('live')">Live</button>
+  </div>
+
+  <!-- BUILD TAB -->
+  <div id="tabBuild">
+
+    <div class="banner" id="resumeBanner" style="display:none;">
+      <span>An in-progress set was found — resume it?</span>
+      <span style="display:flex;gap:6px;">
+        <button onclick="resumeSession()">Resume</button>
+        <button class="dismiss" onclick="dismissResume()">Dismiss</button>
+      </span>
+    </div>
+    <div class="banner" id="lastSetBanner" style="display:none;">
+      <span>Load your last saved set?</span>
+      <span style="display:flex;gap:6px;">
+        <button onclick="loadLastSet()">Load</button>
+        <button class="dismiss" onclick="dismissLastSet()">Dismiss</button>
+      </span>
+    </div>
+
+    <div class="card" id="syncCard" style="display:none;">
+      <div class="muted" style="margin-bottom:8px;">Multi-device sync</div>
+      <div class="import-actions">
+        <input class="field-input" id="joinCodeInput" placeholder="Enter session code" style="flex:1;text-transform:uppercase;">
+        <select class="field-input" id="joinRoleSelect" style="flex:0 0 auto;width:auto;">
+          <option value="viewer">Watch only</option>
+          <option value="cocontrol">Co-control</option>
+        </select>
+        <button class="btn-accent" style="flex:0 0 auto;padding:10px 16px;" onclick="joinSessionFromInput()">Join</button>
+      </div>
+      <div class="status-line" id="syncStatus"></div>
+    </div>
+
+    <button class="import-toggle" onclick="toggleImport()" id="importToggleBtn">📄 Import from PDF / Word</button>
+    <div class="card import-box" id="importBox" style="display:none;">
+      <div class="file-drop">
+        <input type="file" id="fileInput" accept=".pdf,.docx" onchange="handleFile(this.files[0])">
+        <div class="muted" style="margin-top:6px;">PDF or .docx order-of-service file</div>
+      </div>
+      <div class="muted">— or paste the text directly —</div>
+      <textarea id="pasteArea" placeholder="10:30a 5:00 Opening Prayers Daddy Adegboyega Adedeji&#10;10:35a 3:00 You are God alone Worship Team&#10;..."></textarea>
+      <div class="import-actions">
+        <button class="btn-secondary" onclick="toggleImport()">Cancel</button>
+        <button class="btn-accent" onclick="parseImport()">Parse</button>
+      </div>
+      <div class="status-line" id="importStatus"></div>
+    </div>
+
+    <div class="card" id="songListCard">
+      <div id="songList"></div>
+      <button class="add-btn" onclick="addSong()">+ Add Item</button>
+    </div>
+    <div class="total-line">
+      <span id="songCountLbl">0 items</span>
+      <span id="totalDurLbl">Total: 0:00</span>
+    </div>
+    <label style="display:none;align-items:center;gap:8px;margin-top:10px;font-size:13px;color:var(--muted);" id="syncCheckboxRow">
+      <input type="checkbox" id="syncEnabledCheckbox" checked> Enable multi-device sync for this set
+    </label>
+    <button class="primary-btn" id="startBtn" onclick="startSet()" disabled>Start Set</button>
+  </div>
+
+  <!-- LIVE TAB -->
+  <div id="tabLive" style="display:none;">
+    <div id="liveEmpty" class="empty">
+      Build a setlist first, then hit Start Set.
+      <div class="card" id="lobbyCard" style="margin-top:14px;text-align:left;">
+        <div class="muted" style="margin-bottom:8px;">Pre-service countdown (shows on Stage View)</div>
+        <div class="import-actions">
+          <input class="field-input" id="lobbyTimeInput" type="time" style="flex:1;">
+          <button class="btn-accent" style="flex:0 0 auto;padding:10px 16px;" onclick="startLobbyCountdown()">Start</button>
+        </div>
+        <div class="status-line" id="lobbyStatus"></div>
+        <button class="util-btn" id="lobbyCancelBtn" style="display:none;margin-top:8px;width:100%;" onclick="cancelLobbyCountdown()">Cancel countdown</button>
+      </div>
+    </div>
+    <div id="liveContent" style="display:none;">
+      <div class="live-wrap">
+        <div class="set-progress">
+          <span id="progressLbl">Item 1 of 1</span>
+          <span class="schedule-badge ontime" id="scheduleBadge" style="display:none;"></span>
+          <span id="clockLbl"></span>
+        </div>
+        <div class="set-progress" id="sessionCodeRow" style="display:none;">
+          <span id="sessionCodeLbl"></span>
+        </div>
+        <div class="song-name" id="liveSongName">—</div>
+        <div class="song-person-live" id="livePersonName"></div>
+        <div class="next-name" id="liveNextName"></div>
+        <div class="big-timer green" id="bigTimer">0:00</div>
+
+        <div class="set-timer-box">
+          <div>
+            <div class="label">SET CLOCK</div>
+            <div class="val" id="setClockVal">0:00</div>
+          </div>
+          <div style="text-align:right;">
+            <div class="label" id="setClockSubLbl">remaining</div>
+            <div class="val" id="setClockSub">0:00</div>
+          </div>
+        </div>
+
+        <div class="adjust-row" id="adjustRow">
+          <button class="adjust-btn" onclick="adjustSong(-30)">-30s</button>
+          <button class="adjust-btn" onclick="adjustSong(30)">+30s</button>
+          <button class="adjust-btn" onclick="adjustSong(60)">+1m</button>
+        </div>
+
+        <div class="controls" id="controlsRow">
+          <button class="ctrl-btn ctrl-pause" id="pauseBtn" onclick="togglePause()">Pause</button>
+          <button class="ctrl-btn ctrl-next" onclick="nextSong()">Next Item →</button>
+        </div>
+
+        <div class="util-row" id="utilRow">
+          <button class="util-btn" onclick="toggleJumpList()">Jump to item</button>
+          <button class="util-btn" onclick="openStageView()">Open Stage View</button>
+        </div>
+
+        <div class="jump-list" id="jumpList" style="display:none;"></div>
+
+        <button class="end-link" id="endLink" onclick="endSet()">End Set</button>
+        <button class="end-link" id="leaveLink" onclick="leaveSession()" style="display:none;">Leave Session</button>
+      </div>
+    </div>
+    <div id="doneScreen" class="done-screen" style="display:none;">
+      <h2>Set Complete ✅</h2>
+      <p id="doneSummary" style="color:var(--muted);"></p>
+      <table class="report-table" id="reportTable"></table>
+      <button class="primary-btn" onclick="resetAll()">Build New Set</button>
+    </div>
+  </div>
+</div>
+
+<!-- SETTINGS MODAL -->
+<div class="modal-overlay" id="settingsModal" style="display:none;" onclick="if(event.target===this) closeSettings()">
+  <div class="modal-sheet">
+    <h3>Settings</h3>
+    <div class="muted">ProPresenter connection (pushes the current item + time remaining to your Stage Display as a message). Requires Network settings enabled in ProPresenter, on the same network as this device.</div>
+    <div class="field-label">Host / IP address</div>
+    <input class="field-input" id="ppHost" placeholder="192.168.1.50">
+    <div class="field-label">Port</div>
+    <input class="field-input" id="ppPort" placeholder="50000">
+    <div class="field-label">API password (if set in ProPresenter)</div>
+    <input class="field-input" id="ppPassword" placeholder="optional" type="password">
+    <div class="import-actions" style="margin-top:12px;">
+      <button class="btn-secondary" onclick="testProPresenter()">Test Connection</button>
+      <button class="btn-accent" onclick="saveProPresenterSettings()">Save</button>
+    </div>
+    <div class="status-line" id="ppStatus"></div>
+    <label style="display:flex;align-items:center;gap:8px;margin-top:14px;font-size:13px;">
+      <input type="checkbox" id="ppEnabled"> Push updates to ProPresenter during live sets
+    </label>
+    <button class="close-modal" onclick="closeSettings()">Close</button>
+  </div>
+</div>
+
+<script>
+/* ---------------- Storage helpers (window.storage, graceful fallback) ---------------- */
+const hasStorage = typeof window.storage !== 'undefined';
+async function storeGet(key){
+  if(!hasStorage) return null;
+  try{ const r = await window.storage.get(key, false); return r ? JSON.parse(r.value) : null; }
+  catch(e){ return null; }
+}
+async function storeSet(key, value){
+  if(!hasStorage) return;
+  try{ await window.storage.set(key, JSON.stringify(value), false); }
+  catch(e){ /* best effort */ }
+}
+async function storeDelete(key){
+  if(!hasStorage) return;
+  try{ await window.storage.delete(key, false); }
+  catch(e){ /* best effort */ }
+}
+
+/* ---------------- Firebase (multi-device sync) ---------------- */
+const firebaseConfig = {
+  apiKey: "AIzaSyBbQ7wJE-LZFSelcVifXC2afJ25odpLXQs",
+  authDomain: "kcc-set-timer.firebaseapp.com",
+  projectId: "kcc-set-timer",
+  storageBucket: "kcc-set-timer.firebasestorage.app",
+  messagingSenderId: "572628259379",
+  appId: "1:572628259379:web:8ddf5eb1add9cf174bc946"
+};
+let db = null;
+try{
+  const fbApp = firebase.initializeApp(firebaseConfig);
+  db = firebase.firestore();
+} catch(e){
+  console.warn('Firebase unavailable — running in local-only mode.', e);
+}
+
+/* ---------------- State (in-memory, mirrored to storage) ---------------- */
+let songs = []; // {id, title, person, planned (seconds), scheduledMin (minutes since midnight or null)}
+let idCounter = 0;
+let live = null;
+let ppSettings = {host:'', port:'50000', password:'', enabled:false};
+const bc = ('BroadcastChannel' in window) ? new BroadcastChannel('set-timer-cast') : null;
+let wakeLockRef = null;
+let scheduleState = 'ontime';     // 'ontime' | 'behind' | 'ahead' — sticky, see renderLive()
+let scheduleBadgeSongId = null;   // which song the above state belongs to
+
+let sessionCode = null;   // active Firestore doc id, or null if fully local
+let isController = false; // true if this device owns the countdown and writes state
+let fsUnsub = null;       // active onSnapshot unsubscribe function
+let syncEnabledForThisSet = true;
+let deviceRole = 'controller';  // 'controller' | 'cocontrol' | 'viewer' — who this device is in the session
+let fsCommandUnsub = null;      // controller's listener for incoming co-control commands
+let lastAppliedCommandId = null;
+let lobby = { active:false, targetAt:null }; // pre-service countdown target (epoch ms)
+let lobbyTicker = null;
+
+function genCommandId(){
+  return Date.now().toString(36) + Math.random().toString(36).slice(2,8);
+}
+// Any device with a session code can request an action; only the controller
+// (which owns the authoritative countdown) actually applies it.
+function sendCommand(type, extra){
+  if(!db || !sessionCode) return;
+  const cmd = Object.assign({id: genCommandId(), type, ts: Date.now()}, extra || {});
+  db.collection('sets').doc(sessionCode).set({command: cmd}, {merge:true})
+    .catch(err => console.warn('Command send failed', err));
+}
+function fsListenForCommands(){
+  if(!db || !sessionCode) return;
+  if(fsCommandUnsub) fsCommandUnsub();
+  fsCommandUnsub = db.collection('sets').doc(sessionCode).onSnapshot(doc => {
+    if(!doc.exists || !isController) return;
+    const cmd = doc.data().command;
+    if(cmd && cmd.id && cmd.id !== lastAppliedCommandId){
+      lastAppliedCommandId = cmd.id;
+      applyRemoteCommand(cmd);
+      db.collection('sets').doc(sessionCode).set({command: null}, {merge:true}).catch(()=>{});
+    }
+  }, err => console.warn('Command listener failed', err));
+}
+function applyRemoteCommand(cmd){
+  if(!live) return;
+  if(cmd.type === 'next') nextSong();
+  else if(cmd.type === 'pause') togglePause();
+  else if(cmd.type === 'adjust') adjustSong(cmd.amount);
+  else if(cmd.type === 'jump') jumpToItem(cmd.index);
+}
+
+function genSessionCode(){
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // no ambiguous chars
+  let code = '';
+  for(let i=0;i<5;i++) code += chars[Math.floor(Math.random()*chars.length)];
+  return code;
+}
+
+/* ---------------- Import ---------------- */
+function toggleImport(){
+  const box = document.getElementById('importBox');
+  const showing = box.style.display !== 'none';
+  box.style.display = showing ? 'none' : 'block';
+  document.getElementById('importStatus').textContent = '';
+}
+
+async function handleFile(file){
+  if(!file) return;
+  setStatus('Reading file…', '');
+  try{
+    let text = '';
+    if(file.name.toLowerCase().endsWith('.pdf')){
+      text = await extractPdfText(file);
+    } else if(file.name.toLowerCase().endsWith('.docx')){
+      text = await extractDocxText(file);
+    } else {
+      setStatus('Unsupported file type. Use PDF or .docx, or paste the text below.', 'err');
+      return;
+    }
+    document.getElementById('pasteArea').value = text;
+    setStatus('File read. Review the text, then hit Parse.', 'ok');
+  } catch(err){
+    console.error(err);
+    setStatus('Could not read that file. Try pasting the text instead.', 'err');
+  }
+}
+
+async function extractPdfText(file){
+  const buf = await file.arrayBuffer();
+  pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+  const pdf = await pdfjsLib.getDocument({data: buf}).promise;
+  let fullText = '';
+  for(let p = 1; p <= pdf.numPages; p++){
+    const page = await pdf.getPage(p);
+    const content = await page.getTextContent();
+    const lines = {};
+    content.items.forEach(item => {
+      const y = Math.round(item.transform[5] / 3) * 3;
+      if(!lines[y]) lines[y] = [];
+      lines[y].push({x: item.transform[4], str: item.str});
+    });
+    const ys = Object.keys(lines).map(Number).sort((a,b) => b - a);
+    ys.forEach(y => {
+      const sorted = lines[y].sort((a,b) => a.x - b.x);
+      fullText += sorted.map(i => i.str).join(' ').replace(/\s+/g,' ').trim() + '\n';
+    });
+  }
+  return fullText;
+}
+
+async function extractDocxText(file){
+  const buf = await file.arrayBuffer();
+  const result = await mammoth.extractRawText({arrayBuffer: buf});
+  return result.value;
+}
+
+function parseClockTime(str){
+  const m = str.match(/(\d{1,2}):(\d{2})\s*([ap])/i);
+  if(!m) return null;
+  let h = parseInt(m[1],10);
+  const min = parseInt(m[2],10);
+  const ap = m[3].toLowerCase();
+  if(ap === 'p' && h !== 12) h += 12;
+  if(ap === 'a' && h === 12) h = 0;
+  return h*60 + min;
+}
+
+function parseImport(){
+  const text = document.getElementById('pasteArea').value;
+  if(!text.trim()){
+    setStatus('Nothing to parse yet — upload a file or paste text.', 'err');
+    return;
+  }
+  const lineRe = /^\s*(\d{1,2}:\d{2}\s*[apAP]\.?[mM]?\.?)\s+(\d{1,3}):(\d{2})\s+(.+?)\s*$/;
+  const parsed = [];
+  text.split('\n').forEach(rawLine => {
+    const m = rawLine.match(lineRe);
+    if(m){
+      const scheduledMin = parseClockTime(m[1]);
+      const mins = parseInt(m[2],10), secs = parseInt(m[3],10);
+      const title = m[4].trim();
+      if(title.length > 0){
+        parsed.push({id: idCounter++, title, person: '', planned: mins*60 + secs, scheduledMin});
+      }
+    }
+  });
+  if(parsed.length === 0){
+    setStatus("Couldn't find any \"time  length  item\" lines. Check the pasted text matches your template format, or add items manually below.", 'err');
+    return;
+  }
+  songs = parsed;
+  renderSongList();
+  toggleImport();
+  setStatus('', '');
+  document.getElementById('pasteArea').value = '';
+  storeSet('lastSetlist', songs);
+}
+
+function setStatus(msg, cls){
+  const el = document.getElementById('importStatus');
+  el.textContent = msg;
+  el.className = 'status-line' + (cls ? ' ' + cls : '');
+}
+
+/* ---------------- Builder ---------------- */
+function addSong(){
+  songs.push({id: idCounter++, title:'', person:'', planned: 180, scheduledMin: null});
+  renderSongList();
+}
+function removeSong(id){
+  songs = songs.filter(s => s.id !== id);
+  renderSongList();
+}
+function moveSong(id, dir){
+  const i = songs.findIndex(s => s.id === id);
+  const j = i + dir;
+  if(j < 0 || j >= songs.length) return;
+  [songs[i], songs[j]] = [songs[j], songs[i]];
+  renderSongList();
+}
+function updateTitle(id, val){
+  const s = songs.find(s => s.id === id);
+  if(s) s.title = val;
+  updateStartState();
+  persistBuilder();
+}
+function updatePerson(id, val){
+  const s = songs.find(s => s.id === id);
+  if(s) s.person = val;
+  persistBuilder();
+}
+function updateDur(id, mins, secs){
+  const s = songs.find(s => s.id === id);
+  if(!s) return;
+  const m = Math.max(0, parseInt(mins,10) || 0);
+  const sc = Math.max(0, Math.min(59, parseInt(secs,10) || 0));
+  s.planned = m*60 + sc;
+  renderTotals();
+  persistBuilder();
+}
+function persistBuilder(){
+  storeSet('lastSetlist', songs);
+}
+function fmt(totalSeconds, forceSign){
+  const neg = totalSeconds < 0;
+  const abs = Math.abs(Math.round(totalSeconds));
+  const m = Math.floor(abs/60);
+  const s = abs%60;
+  const base = m + ':' + String(s).padStart(2,'0');
+  if(neg) return '-' + base;
+  if(forceSign) return '+' + base;
+  return base;
+}
+function renderSongList(){
+  const list = document.getElementById('songList');
+  if(songs.length === 0){
+    list.innerHTML = '<div class="empty">No items yet. Import a file above, or add one manually.</div>';
+  } else {
+    list.innerHTML = songs.map((s, i) => {
+      const m = Math.floor(s.planned/60), sc = s.planned%60;
+      return `
+      <div class="song-row">
+        <div class="song-num">${i+1}</div>
+        <div class="song-fields">
+          <input class="song-title" placeholder="Item name" value="${escapeHtml(s.title)}"
+            oninput="updateTitle(${s.id}, this.value)">
+          <input class="song-person" placeholder="Who's leading (optional)" value="${escapeHtml(s.person||'')}"
+            oninput="updatePerson(${s.id}, this.value)">
+          <div class="dur-row">
+            <input class="dur-input" type="number" min="0" value="${m}"
+              onchange="updateDur(${s.id}, this.value, ${sc})"> <span class="dur-sep">min</span>
+            <input class="dur-input" type="number" min="0" max="59" value="${sc}"
+              onchange="updateDur(${s.id}, ${m}, this.value)"> <span class="dur-sep">sec</span>
+          </div>
+        </div>
+        <div class="row-actions">
+          <button class="icon-btn" onclick="moveSong(${s.id}, -1)" ${i===0?'disabled':''}>↑</button>
+          <button class="icon-btn" onclick="moveSong(${s.id}, 1)" ${i===songs.length-1?'disabled':''}>↓</button>
+        </div>
+        <button class="icon-btn danger" onclick="removeSong(${s.id})">✕</button>
+      </div>`;
+    }).join('');
+  }
+  renderTotals();
+  updateStartState();
+}
+function renderTotals(){
+  const total = songs.reduce((a,s) => a + s.planned, 0);
+  document.getElementById('songCountLbl').textContent = songs.length + (songs.length===1 ? ' item' : ' items');
+  document.getElementById('totalDurLbl').textContent = 'Total: ' + fmt(total);
+}
+function updateStartState(){
+  const ready = songs.length > 0 && songs.every(s => s.title.trim().length > 0);
+  document.getElementById('startBtn').disabled = !ready;
+}
+function escapeHtml(str){
+  const d = document.createElement('div');
+  d.textContent = str;
+  return d.innerHTML;
+}
+
+/* ---------------- Tabs ---------------- */
+function switchTab(tab){
+  document.getElementById('tabBuild').style.display = tab==='build' ? 'block':'none';
+  document.getElementById('tabLive').style.display = tab==='live' ? 'block':'none';
+  document.getElementById('tabBuildBtn').classList.toggle('active', tab==='build');
+  document.getElementById('tabLiveBtn').classList.toggle('active', tab==='live');
+}
+
+/* ---------------- Wake lock ---------------- */
+async function requestWakeLock(){
+  try{
+    if('wakeLock' in navigator){
+      wakeLockRef = await navigator.wakeLock.request('screen');
+    }
+  } catch(e){ /* not fatal — device may not support it or permission denied */ }
+}
+function releaseWakeLock(){
+  if(wakeLockRef){ wakeLockRef.release().catch(()=>{}); wakeLockRef = null; }
+}
+document.addEventListener('visibilitychange', () => {
+  if(live && document.visibilityState === 'visible') requestWakeLock();
+});
+
+/* ---------------- Live logic ---------------- */
+function startSet(fromResume){
+  isController = true;
+  deviceRole = 'controller';
+  lastAppliedCommandId = null;
+  scheduleState = 'ontime';
+  scheduleBadgeSongId = null;
+  if(!fromResume){
+    const total = songs.reduce((a,s) => a + s.planned, 0);
+    live = {
+      order: songs.map(s => ({title:s.title, person:s.person, planned:s.planned, scheduledMin:s.scheduledMin, actual:null})),
+      index: 0,
+      songRemaining: songs[0].planned,
+      setRemaining: total,
+      paused: false,
+      timerId: null,
+      startedAt: Date.now(),
+      itemStartedAt: Date.now(),
+      epoch: Date.now()
+    };
+    syncEnabledForThisSet = document.getElementById('syncEnabledCheckbox') ?
+      document.getElementById('syncEnabledCheckbox').checked : true;
+    if(db && syncEnabledForThisSet){
+      sessionCode = genSessionCode();
+      fsWriteState(true);
+      fsListenForCommands();
+    } else {
+      sessionCode = null;
+    }
+  } else if(db && sessionCode){
+    fsListenForCommands();
+  }
+  document.getElementById('liveEmpty').style.display = 'none';
+  document.getElementById('doneScreen').style.display = 'none';
+  document.getElementById('liveContent').style.display = 'block';
+  applyControllerModeUI();
+  switchTab('live');
+  renderLive();
+  requestWakeLock();
+  if(live.timerId) clearInterval(live.timerId);
+  live.timerId = setInterval(tick, 1000);
+}
+function syncClock(){
+  // Corrects for Chrome throttling/suspending setInterval in background tabs.
+  // Instead of trusting "one tick = one second", we measure real elapsed
+  // wall-clock time since the last sync and catch the countdown up to it.
+  if(!live || live.paused || !live.epoch) return;
+  const now = Date.now();
+  const elapsed = Math.floor((now - live.epoch) / 1000);
+  if(elapsed <= 0) return;
+  live.songRemaining -= elapsed;
+  live.setRemaining -= elapsed;
+  live.epoch += elapsed * 1000;
+}
+function tick(){
+  if(!live || live.paused) { renderLive(); return; }
+  syncClock();
+  renderLive();
+  persistLiveSession();
+  pushToProPresenter();
+  fsWriteState();
+}
+document.addEventListener('visibilitychange', () => {
+  // Force an immediate catch-up the moment the tab is foregrounded again,
+  // rather than waiting for the next (possibly delayed) interval tick.
+  if(!document.hidden && live && !live.paused){
+    syncClock();
+    renderLive();
+    persistLiveSession();
+    fsWriteState();
+  }
+});
+
+/* ---------------- Firestore sync ---------------- */
+function fsWriteState(isNew){
+  if(!db || !sessionCode || !isController || !live) return;
+  const payload = {
+    order: live.order, index: live.index, songRemaining: live.songRemaining,
+    setRemaining: live.setRemaining, paused: live.paused, ended: false,
+    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+  };
+  if(isNew) payload.createdAt = firebase.firestore.FieldValue.serverTimestamp();
+  db.collection('sets').doc(sessionCode).set(payload, {merge:true})
+    .catch(err => console.warn('Firestore write failed', err));
+}
+function fsMarkEnded(){
+  if(!db || !sessionCode || !isController) return;
+  db.collection('sets').doc(sessionCode).set({ended:true}, {merge:true})
+    .catch(err => console.warn('Firestore write failed', err));
+}
+function joinSessionFromInput(){
+  const code = document.getElementById('joinCodeInput').value.trim().toUpperCase();
+  const role = document.getElementById('joinRoleSelect') ? document.getElementById('joinRoleSelect').value : 'viewer';
+  const statusEl = document.getElementById('syncStatus');
+  if(!code){ statusEl.textContent = 'Enter a code first.'; statusEl.className='status-line err'; return; }
+  if(!db){ statusEl.textContent = 'Cloud sync unavailable on this device.'; statusEl.className='status-line err'; return; }
+  fsJoinSession(code, role);
+}
+function fsJoinSession(code, role){
+  const statusEl = document.getElementById('syncStatus');
+  isController = false;
+  deviceRole = role || 'viewer';
+  sessionCode = code;
+  if(fsUnsub) fsUnsub();
+  fsUnsub = db.collection('sets').doc(code).onSnapshot(doc => {
+    if(!doc.exists){
+      statusEl.textContent = 'No session found with that code.';
+      statusEl.className = 'status-line err';
+      return;
+    }
+    const d = doc.data();
+    live = {
+      order: d.order, index: d.index, songRemaining: d.songRemaining,
+      setRemaining: d.setRemaining, paused: d.paused, timerId: live ? live.timerId : null
+    };
+    document.getElementById('liveEmpty').style.display = 'none';
+    if(d.ended){
+      document.getElementById('doneSummary').textContent = 'This set has ended.';
+      document.getElementById('reportTable').innerHTML = '';
+      document.getElementById('liveContent').style.display = 'none';
+      document.getElementById('doneScreen').style.display = 'block';
+      return;
+    }
+    document.getElementById('doneScreen').style.display = 'none';
+    document.getElementById('liveContent').style.display = 'block';
+    if(deviceRole === 'cocontrol') applyCoControlModeUI(); else applyViewerModeUI();
+    switchTab('live');
+    renderLive();
+  }, err => {
+    console.warn('Firestore listen failed', err);
+    statusEl.textContent = "Couldn't connect to that session.";
+    statusEl.className = 'status-line err';
+  });
+}
+function leaveSession(){
+  if(fsUnsub){ fsUnsub(); fsUnsub = null; }
+  sessionCode = null;
+  isController = false;
+  deviceRole = 'controller';
+  live = null;
+  document.getElementById('liveContent').style.display = 'none';
+  document.getElementById('liveEmpty').style.display = 'block';
+  switchTab('build');
+}
+function applyViewerModeUI(){
+  document.getElementById('adjustRow').style.display = 'none';
+  document.getElementById('controlsRow').style.display = 'none';
+  document.getElementById('utilRow').style.display = 'none';
+  document.getElementById('endLink').style.display = 'none';
+  document.getElementById('leaveLink').style.display = 'inline';
+  const row = document.getElementById('sessionCodeRow');
+  row.style.display = 'flex';
+  document.getElementById('sessionCodeLbl').textContent = 'Viewing session ' + sessionCode;
+}
+function applyCoControlModeUI(){
+  // Same live controls as the owning controller (pause/next/adjust/jump),
+  // but this device only ever sends requests — see sendCommand() — since
+  // the controller device is the one running the authoritative countdown.
+  document.getElementById('adjustRow').style.display = 'flex';
+  document.getElementById('controlsRow').style.display = 'flex';
+  document.getElementById('utilRow').style.display = 'flex';
+  document.getElementById('endLink').style.display = 'none';
+  document.getElementById('leaveLink').style.display = 'inline';
+  const row = document.getElementById('sessionCodeRow');
+  row.style.display = 'flex';
+  document.getElementById('sessionCodeLbl').textContent = 'Co-controlling session ' + sessionCode;
+}
+function applyControllerModeUI(){
+  document.getElementById('adjustRow').style.display = 'flex';
+  document.getElementById('controlsRow').style.display = 'flex';
+  document.getElementById('utilRow').style.display = 'flex';
+  document.getElementById('endLink').style.display = 'inline';
+  document.getElementById('leaveLink').style.display = 'none';
+  const row = document.getElementById('sessionCodeRow');
+  if(sessionCode){
+    row.style.display = 'flex';
+    document.getElementById('sessionCodeLbl').textContent = 'Session code: ' + sessionCode + ' (share for other devices)';
+  } else {
+    row.style.display = 'none';
+  }
+}
+function persistLiveSession(){
+  if(!live) return;
+  storeSet('liveSession', {
+    order: live.order, index: live.index, songRemaining: live.songRemaining,
+    setRemaining: live.setRemaining, paused: live.paused, startedAt: live.startedAt
+  });
+}
+function renderLive(){
+  if(!live) return;
+  const cur = live.order[live.index];
+  const next = live.order[live.index+1];
+  document.getElementById('progressLbl').textContent = `Item ${live.index+1} of ${live.order.length}`;
+  document.getElementById('clockLbl').textContent = new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+  document.getElementById('liveSongName').textContent = cur.title;
+  document.getElementById('livePersonName').textContent = cur.person || '';
+  document.getElementById('liveNextName').textContent = next ? ('Next: ' + next.title) : 'Last item';
+
+  const bigTimer = document.getElementById('bigTimer');
+  bigTimer.textContent = fmt(live.songRemaining, live.songRemaining < 0);
+  bigTimer.classList.remove('green','amber','red');
+  let timerClass = 'green';
+  if(live.songRemaining < 0) timerClass = 'red';
+  else if(live.songRemaining <= 30) timerClass = 'amber';
+  bigTimer.classList.add(timerClass);
+
+  const setVal = document.getElementById('setClockVal');
+  const setSub = document.getElementById('setClockSub');
+  const setSubLbl = document.getElementById('setClockSubLbl');
+  setVal.textContent = fmt(live.setRemaining, live.setRemaining < 0);
+  setVal.classList.toggle('over', live.setRemaining < 0);
+  setSubLbl.textContent = live.setRemaining < 0 ? 'over by' : 'remaining';
+  setSub.textContent = fmt(live.setRemaining, false);
+
+  document.getElementById('pauseBtn').textContent = live.paused ? 'Resume' : 'Pause';
+
+  // Schedule badge: compare wall clock to this item's scheduled start time.
+  // Uses rounded minutes + hysteresis so it doesn't flicker to "1 min behind"
+  // from ordinary second-level jitter right around a minute boundary.
+  const badge = document.getElementById('scheduleBadge');
+  if(cur.scheduledMin != null){
+    const now = new Date();
+    const nowMin = now.getHours()*60 + now.getMinutes() + now.getSeconds()/60;
+    const diff = nowMin - cur.scheduledMin; // positive = running late
+    const roundedDiff = Math.round(diff);   // whole minutes for display
+
+    if(scheduleBadgeSongId !== cur.id){
+      // new item — start fresh instead of carrying over the last item's state
+      scheduleBadgeSongId = cur.id;
+      scheduleState = 'ontime';
+    }
+    // Enter a state once clearly past 1.5 min off; only leave it once back
+    // under 1.0 min off. That half-minute gap is the anti-flicker margin.
+    if(scheduleState !== 'behind' && diff > 1.5) scheduleState = 'behind';
+    else if(scheduleState === 'behind' && diff <= 1.0) scheduleState = 'ontime';
+    if(scheduleState !== 'ahead' && diff < -1.5) scheduleState = 'ahead';
+    else if(scheduleState === 'ahead' && diff >= -1.0) scheduleState = 'ontime';
+
+    badge.style.display = 'inline-block';
+    badge.classList.remove('ontime','behind','ahead');
+    if(scheduleState === 'behind'){
+      badge.textContent = fmt(Math.abs(roundedDiff)*60) + ' behind';
+      badge.classList.add('behind');
+    } else if(scheduleState === 'ahead'){
+      badge.textContent = fmt(Math.abs(roundedDiff)*60) + ' ahead';
+      badge.classList.add('ahead');
+    } else {
+      badge.textContent = 'on schedule';
+      badge.classList.add('ontime');
+    }
+  } else {
+    badge.style.display = 'none';
+  }
+
+  // broadcast to stage cast view
+  if(bc){
+    bc.postMessage({
+      type:'update', title: cur.title, timerText: bigTimer.textContent,
+      timerClass, nextText: next ? ('Next: ' + next.title) : 'Last item'
+    });
+  }
+
+  if(document.getElementById('jumpList').style.display !== 'none') renderJumpList();
+}
+function togglePause(){
+  if(!live) return;
+  if(deviceRole === 'cocontrol'){ sendCommand('pause'); return; }
+  if(!live.paused){
+    // about to pause: capture any elapsed time first
+    syncClock();
+    live.paused = true;
+  } else {
+    // resuming: restart the clock reference from now
+    live.epoch = Date.now();
+    live.paused = false;
+  }
+  renderLive();
+  persistLiveSession();
+  fsWriteState();
+}
+function adjustSong(deltaSeconds){
+  if(!live) return;
+  if(deviceRole === 'cocontrol'){ sendCommand('adjust', {amount: deltaSeconds}); return; }
+  live.songRemaining += deltaSeconds;
+  live.setRemaining += deltaSeconds;
+  renderLive();
+  persistLiveSession();
+  fsWriteState();
+}
+function finishCurrentItemActual(){
+  syncClock();
+  const cur = live.order[live.index];
+  cur.actual = cur.planned - live.songRemaining;
+}
+function nextSong(){
+  if(!live) return;
+  if(deviceRole === 'cocontrol'){ sendCommand('next'); return; }
+  finishCurrentItemActual();
+  if(live.index >= live.order.length - 1){
+    endSet();
+    return;
+  }
+  live.index += 1;
+  live.songRemaining = live.order[live.index].planned;
+  live.itemStartedAt = Date.now();
+  live.epoch = Date.now();
+  renderLive();
+  persistLiveSession();
+  pushToProPresenter();
+  fsWriteState();
+}
+
+/* ---------------- Jump to item ---------------- */
+function toggleJumpList(){
+  const el = document.getElementById('jumpList');
+  el.style.display = el.style.display === 'none' ? 'block' : 'none';
+  if(el.style.display === 'block') renderJumpList();
+}
+function renderJumpList(){
+  const el = document.getElementById('jumpList');
+  el.innerHTML = live.order.map((it, i) => `
+    <div class="jump-item ${i===live.index?'current':''}">
+      <span>${i+1}. ${escapeHtml(it.title)}</span>
+      ${i===live.index ? '<span>current</span>' : `<button onclick="jumpToItem(${i})">Jump</button>`}
+    </div>
+  `).join('');
+}
+function jumpToItem(i){
+  if(!live) return;
+  if(deviceRole === 'cocontrol'){ sendCommand('jump', {index: i}); toggleJumpList(); return; }
+  finishCurrentItemActual();
+  live.index = i;
+  live.songRemaining = live.order[i].planned;
+  live.epoch = Date.now();
+  renderLive();
+  persistLiveSession();
+  pushToProPresenter();
+  fsWriteState();
+  toggleJumpList();
+}
+
+/* ---------------- Stage cast view ---------------- */
+function openStageView(){
+  const base = window.location.href.split('#')[0].split('?')[0];
+  const q = (lobby.active && !live) ? `?lobbyTarget=${lobby.targetAt}` : '';
+  window.open(base + q + '#stage', '_blank');
+}
+if(location.hash === '#stage'){
+  document.body.classList.add('stage-view');
+
+  // Screen orientation lock / manual rotate for mounted displays or monitors
+  // that are physically rotated (very common for stage/confidence monitors).
+  const savedRot = localStorage.getItem('stageRotation') || '0';
+  document.body.setAttribute('data-rot', savedRot);
+
+  let stageWakeLock = null;
+  async function requestStageWakeLock(){
+    try{
+      if('wakeLock' in navigator) stageWakeLock = await navigator.wakeLock.request('screen');
+    } catch(e){ /* not fatal — device may not support it or permission denied */ }
+  }
+  requestStageWakeLock();
+  document.addEventListener('visibilitychange', () => {
+    if(document.visibilityState === 'visible') requestStageWakeLock();
+  });
+
+  window.rotateStageView = function(){
+    const order = ['0','90','180','270'];
+    const cur = document.body.getAttribute('data-rot') || '0';
+    const next = order[(order.indexOf(cur) + 1) % order.length];
+    document.body.setAttribute('data-rot', next);
+    localStorage.setItem('stageRotation', next);
+    // If the browser supports it and we're in fullscreen, try to match the
+    // real screen orientation too (best-effort — many browsers/OSes refuse
+    // this outside fullscreen, hence the manual CSS rotate as the fallback).
+    if(screen.orientation && screen.orientation.lock && document.fullscreenElement){
+      const type = (next === '90' || next === '270') ? 'landscape' : 'portrait';
+      screen.orientation.lock(type).catch(() => {});
+    }
+  };
+
+  window.toggleStageFullscreen = function(){
+    if(!document.fullscreenElement){
+      document.documentElement.requestFullscreen().catch(() => {});
+    } else {
+      document.exitFullscreen().catch(() => {});
+    }
+  };
+}
+let stageLobbyTicker = null;
+let stageLiveStarted = false; // true once a real 'update' (set actually running) has arrived
+function renderStageLobby(targetAt){
+  const remaining = Math.max(0, Math.round((targetAt - Date.now()) / 1000));
+  document.getElementById('stageTitle').textContent = remaining > 0 ? 'Service starts in' : 'Starting now';
+  const t = document.getElementById('stageTimer');
+  t.textContent = fmt(remaining);
+  t.classList.remove('green','amber','red');
+  t.classList.add(remaining > 0 ? 'green' : 'amber');
+  document.getElementById('stageNext').textContent = '';
+}
+if(bc){
+  bc.onmessage = (ev) => {
+    if(!document.body.classList.contains('stage-view')) return;
+    if(ev.data.type === 'update'){
+      stageLiveStarted = true;
+      if(stageLobbyTicker){ clearInterval(stageLobbyTicker); stageLobbyTicker = null; }
+      document.getElementById('stageTitle').textContent = ev.data.title;
+      const t = document.getElementById('stageTimer');
+      t.textContent = ev.data.timerText;
+      t.classList.remove('green','amber','red');
+      t.classList.add(ev.data.timerClass);
+      document.getElementById('stageNext').textContent = ev.data.nextText;
+    } else if(ev.data.type === 'lobby'){
+      if(stageLiveStarted) return; // a real set is already running — ignore stale lobby pings
+      if(stageLobbyTicker){ clearInterval(stageLobbyTicker); stageLobbyTicker = null; }
+      if(ev.data.active){
+        renderStageLobby(ev.data.targetAt);
+        stageLobbyTicker = setInterval(() => renderStageLobby(ev.data.targetAt), 1000);
+      } else {
+        document.getElementById('stageTitle').textContent = 'Waiting for set to start…';
+        document.getElementById('stageTimer').textContent = '0:00';
+        document.getElementById('stageNext').textContent = '';
+      }
+    }
+  };
+}
+
+if(location.hash === '#stage'){
+  const stageParams = new URLSearchParams(window.location.search);
+  const initialLobbyTarget = stageParams.get('lobbyTarget');
+  if(initialLobbyTarget){
+    renderStageLobby(Number(initialLobbyTarget));
+    stageLobbyTicker = setInterval(() => renderStageLobby(Number(initialLobbyTarget)), 1000);
+  }
+}
+
+/* ---------------- End / report ---------------- */
+function endSet(){
+  finishCurrentItemActual();
+  if(live && live.timerId) clearInterval(live.timerId);
+  releaseWakeLock();
+  const wasOver = live && live.setRemaining < 0;
+  const summary = live ? (wasOver
+    ? `Set ran ${fmt(Math.abs(live.setRemaining))} over.`
+    : `Finished with ${fmt(live.setRemaining)} to spare.`) : '';
+  document.getElementById('doneSummary').textContent = summary;
+
+  const table = document.getElementById('reportTable');
+  if(live){
+    let rows = '<tr><th>Item</th><th>Planned</th><th>Actual</th><th>Diff</th></tr>';
+    live.order.forEach(it => {
+      if(it.actual == null){ return; }
+      const diff = it.actual - it.planned;
+      const diffCls = diff > 0 ? 'over' : (diff < 0 ? 'under' : '');
+      rows += `<tr><td>${escapeHtml(it.title)}</td><td>${fmt(it.planned)}</td><td>${fmt(it.actual)}</td><td class="${diffCls}">${fmt(diff, true)}</td></tr>`;
+    });
+    table.innerHTML = rows;
+  }
+
+  document.getElementById('liveContent').style.display = 'none';
+  document.getElementById('doneScreen').style.display = 'block';
+  fsMarkEnded();
+  if(fsCommandUnsub){ fsCommandUnsub(); fsCommandUnsub = null; }
+  live = null;
+  sessionCode = null;
+  isController = false;
+  deviceRole = 'controller';
+  storeDelete('liveSession');
+}
+function resetAll(){
+  document.getElementById('doneScreen').style.display = 'none';
+  document.getElementById('liveEmpty').style.display = 'block';
+  switchTab('build');
+}
+
+/* ---------------- Resume / last-set banners ---------------- */
+async function checkResumeAndLastSet(){
+  const session = await storeGet('liveSession');
+  if(session && session.order && session.order.length){
+    document.getElementById('resumeBanner').style.display = 'flex';
+    window._pendingSession = session;
+  } else {
+    const last = await storeGet('lastSetlist');
+    if(last && last.length){
+      document.getElementById('lastSetBanner').style.display = 'flex';
+      window._pendingLastSet = last;
+    }
+  }
+}
+function resumeSession(){
+  const s = window._pendingSession;
+  if(!s) return;
+  live = {
+    order: s.order, index: s.index, songRemaining: s.songRemaining,
+    setRemaining: s.setRemaining, paused: true, timerId: null, startedAt: s.startedAt,
+    epoch: Date.now()
+  };
+  document.getElementById('resumeBanner').style.display = 'none';
+  startSet(true);
+}
+function dismissResume(){
+  document.getElementById('resumeBanner').style.display = 'none';
+  storeDelete('liveSession');
+}
+function loadLastSet(){
+  const last = window._pendingLastSet;
+  if(!last) return;
+  songs = last;
+  idCounter = Math.max(0, ...songs.map(s=>s.id)) + 1;
+  renderSongList();
+  document.getElementById('lastSetBanner').style.display = 'none';
+}
+function dismissLastSet(){
+  document.getElementById('lastSetBanner').style.display = 'none';
+}
+
+/* ---------------- ProPresenter integration ---------------- */
+function openSettings(){
+  document.getElementById('ppHost').value = ppSettings.host;
+  document.getElementById('ppPort').value = ppSettings.port;
+  document.getElementById('ppPassword').value = ppSettings.password;
+  document.getElementById('ppEnabled').checked = ppSettings.enabled;
+  document.getElementById('settingsModal').style.display = 'flex';
+}
+function closeSettings(){
+  document.getElementById('settingsModal').style.display = 'none';
+}
+function readSettingsForm(){
+  return {
+    host: document.getElementById('ppHost').value.trim(),
+    port: document.getElementById('ppPort').value.trim() || '50000',
+    password: document.getElementById('ppPassword').value,
+    enabled: document.getElementById('ppEnabled').checked
+  };
+}
+function ppBaseUrl(s){
+  return `http://${s.host}:${s.port}`;
+}
+async function testProPresenter(){
+  const s = readSettingsForm();
+  const statusEl = document.getElementById('ppStatus');
+  if(!s.host){ statusEl.textContent = 'Enter a host/IP first.'; statusEl.className='status-line err'; return; }
+  statusEl.textContent = 'Testing…'; statusEl.className='status-line';
+  try{
+    const headers = {};
+    if(s.password) headers['Authorization'] = 'Basic ' + btoa(':' + s.password);
+    const res = await fetch(ppBaseUrl(s) + '/version', {headers, mode:'cors'});
+    if(!res.ok) throw new Error('HTTP ' + res.status);
+    const data = await res.json().catch(() => ({}));
+    statusEl.textContent = 'Connected' + (data.version ? (' — v' + data.version) : '') + '.';
+    statusEl.className = 'status-line ok';
+  } catch(err){
+    console.error(err);
+    statusEl.textContent = "Couldn't reach ProPresenter. Check the IP/port, that Network → Enable API is on in ProPresenter's settings, and that this device is on the same network. (Browser security may also block this — see note below.)";
+    statusEl.className = 'status-line err';
+  }
+}
+function saveProPresenterSettings(){
+  ppSettings = readSettingsForm();
+  storeSet('ppSettings', ppSettings);
+  document.getElementById('ppStatus').textContent = 'Saved.';
+  document.getElementById('ppStatus').className = 'status-line ok';
+}
+async function pushToProPresenter(){
+  if(!ppSettings.enabled || !ppSettings.host || !live) return;
+  const cur = live.order[live.index];
+  const msg = `${cur.title} — ${fmt(live.songRemaining, live.songRemaining<0)}`;
+  try{
+    const headers = {'Content-Type': 'application/json'};
+    if(ppSettings.password) headers['Authorization'] = 'Basic ' + btoa(':' + ppSettings.password);
+    await fetch(ppBaseUrl(ppSettings) + '/v1/stage/message', {
+      method: 'PUT', headers, mode: 'cors', body: JSON.stringify(msg)
+    });
+  } catch(err){
+    // Silent fail during a live service — don't interrupt the countdown over a network hiccup.
+    console.warn('ProPresenter push failed', err);
+  }
+}
+
+/* ---------------- Pre-service lobby countdown ---------------- */
+function startLobbyCountdown(){
+  const val = document.getElementById('lobbyTimeInput').value; // "HH:MM" from <input type=time>
+  const statusEl = document.getElementById('lobbyStatus');
+  if(!val){ statusEl.textContent = 'Pick a start time first.'; statusEl.className = 'status-line err'; return; }
+  const [h, m] = val.split(':').map(Number);
+  const now = new Date();
+  const target = new Date(now.getFullYear(), now.getMonth(), now.getDate(), h, m, 0, 0);
+  if(target.getTime() <= now.getTime()) target.setDate(target.getDate() + 1); // already passed today — assume tomorrow
+  lobby = { active: true, targetAt: target.getTime() };
+  storeSet('lobbyState', lobby);
+  broadcastLobby();
+  if(db && sessionCode && isController){
+    db.collection('sets').doc(sessionCode).set({lobbyActive: true, lobbyTargetAt: lobby.targetAt}, {merge:true}).catch(()=>{});
+  }
+  document.getElementById('lobbyCancelBtn').style.display = 'block';
+  updateLobbyStatusText();
+  if(lobbyTicker) clearInterval(lobbyTicker);
+  lobbyTicker = setInterval(updateLobbyStatusText, 1000);
+}
+function cancelLobbyCountdown(){
+  lobby = { active: false, targetAt: null };
+  storeDelete('lobbyState');
+  broadcastLobby();
+  if(db && sessionCode && isController){
+    db.collection('sets').doc(sessionCode).set({lobbyActive: false, lobbyTargetAt: null}, {merge:true}).catch(()=>{});
+  }
+  if(lobbyTicker){ clearInterval(lobbyTicker); lobbyTicker = null; }
+  const statusEl = document.getElementById('lobbyStatus');
+  if(statusEl){ statusEl.textContent = ''; statusEl.className = 'status-line'; }
+  const btn = document.getElementById('lobbyCancelBtn');
+  if(btn) btn.style.display = 'none';
+}
+function broadcastLobby(){
+  if(bc) bc.postMessage({type:'lobby', active: lobby.active, targetAt: lobby.targetAt});
+}
+function updateLobbyStatusText(){
+  const statusEl = document.getElementById('lobbyStatus');
+  if(!statusEl || !lobby.active) return;
+  const remaining = Math.max(0, Math.round((lobby.targetAt - Date.now()) / 1000));
+  statusEl.className = 'status-line';
+  statusEl.textContent = remaining > 0
+    ? `Counting down on Stage View — starts in ${fmt(remaining)}.`
+    : 'Start time reached.';
+}
+
+/* ---------------- Init ---------------- */
+if('serviceWorker' in navigator){
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js').catch(err => console.warn('SW registration failed', err));
+  });
+}
+(async function init(){
+  renderSongList();
+  const savedPp = await storeGet('ppSettings');
+  if(savedPp) ppSettings = savedPp;
+
+  if(db){
+    document.getElementById('syncCard').style.display = 'block';
+    document.getElementById('syncCheckboxRow').style.display = 'flex';
+  }
+
+  const savedLobby = await storeGet('lobbyState');
+  if(savedLobby && savedLobby.active && savedLobby.targetAt > Date.now()){
+    lobby = savedLobby;
+    broadcastLobby();
+    document.getElementById('lobbyCancelBtn').style.display = 'block';
+    updateLobbyStatusText();
+    lobbyTicker = setInterval(updateLobbyStatusText, 1000);
+  } else if(savedLobby){
+    storeDelete('lobbyState');
+  }
+
+  const params = new URLSearchParams(window.location.search);
+  const joinParam = params.get('join');
+  if(joinParam && db){
+    fsJoinSession(joinParam.trim().toUpperCase());
+  } else {
+    await checkResumeAndLastSet();
+  }
+})();
+</script>
+</body>
+</html>
